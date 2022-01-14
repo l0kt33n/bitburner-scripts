@@ -76,7 +76,13 @@ export async function main(ns) {
                     log(ns, `INFO: Sleeve ${i} is syncing... ${sync.toFixed(2)}%`);
                     lastUpdate[i] = Date.now();
                 }
-            } else if (shock > 0 && options['shock-recovery'] > 0 && Math.random() < options['shock-recovery']) { // Recover from shock
+            } 
+            else if(!(await getNsDataThroughFile(ns, 'ns.gang.inGang()', '/Temp/player-gang-joined.txt'))) { // Farm Karma if not in gang
+                let crime = options.crime || (sleeveStats.strength < 100 ? 'mug' : 'homicide');
+                designatedTask = `commit ${crime}`;
+                command = `ns.sleeve.setToCommitCrime(${i}, '${crime}')`;
+            }
+            else if (shock > 0 && options['shock-recovery'] > 0 && Math.random() < options['shock-recovery']) { // Recover from shock
                 designatedTask = "recover from shock";
                 command = `ns.sleeve.setToShockRecovery(${i})`;
                 if (task[i] == designatedTask && Date.now() - (lastUpdate[i] ?? 0) > minTaskWorkTime) {
@@ -92,9 +98,8 @@ export async function main(ns) {
                 designatedTask = `work for company '${playerInfo.companyName}'`;
                 command = `ns.sleeve.setToCompanyWork(${i}, '${playerInfo.companyName}')`;
             } else { // Do something productive
-                let crime = options.crime || (sleeveStats.strength < 100 ? 'mug' : 'homicide');
-                designatedTask = `commit ${crime}`;
-                command = `ns.sleeve.setToCommitCrime(${i}, '${crime}')`;
+                designatedTask = 'Taking Algorithms course at ZB Institute of Technology';
+                command = `ns.sleeve.setToUniversityCourse(${i}, 'ZB Institute of Technology', 'Algorithms')`;
             }
             // Don't change tasks if we've changed tasks recently
             if (Date.now() - (lastReassign[i] || 0) < minTaskWorkTime || task[i] == designatedTask) continue;
