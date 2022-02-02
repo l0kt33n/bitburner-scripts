@@ -44,6 +44,7 @@ export async function main(ns) {
         let playerInfo = await getNsDataThroughFile(ns, 'ns.getPlayer()', '/Temp/player-info.txt')
         for (let i = 0; i < numSleeves; i++) {
             let sleeveStats = ns.sleeve.getSleeveStats(i);
+            let sleeveCity = ns.sleeve.getInformation(i).city;
             let shock = sleeveStats.shock;
             let sync = sleeveStats.sync;
             // Manage Augmentations
@@ -76,11 +77,37 @@ export async function main(ns) {
                     log(ns, `INFO: Sleeve ${i} is syncing... ${sync.toFixed(2)}%`);
                     lastUpdate[i] = Date.now();
                 }
-            } 
-            else if(!(await getNsDataThroughFile(ns, 'ns.gang.inGang()', '/Temp/player-gang-joined.txt'))) { // Farm Karma if not in gang
-                let crime = options.crime || (sleeveStats.strength < 100 ? 'mug' : 'homicide');
-                designatedTask = `commit ${crime}`;
-                command = `ns.sleeve.setToCommitCrime(${i}, '${crime}')`;
+            } else if(sleeveStats.strength < 100){
+                designatedTask = `training strength`;
+                if(sleeveCity != "Sector-12"){
+                    command = `ns.sleeve.travel(${i}, "Sector-12")`;
+                    await getNsDataThroughFile(ns, command, tempFile);
+                }
+                command = `ns.sleeve.setToGymWorkout(${i}, "Powerhouse Gym", "str")`;
+            } else if(sleeveStats.defense < 100){
+                designatedTask = `training defense`;
+                if(sleeveCity != "Sector-12"){
+                    command = `ns.sleeve.travel(${i}, "Sector-12")`;
+                    await getNsDataThroughFile(ns, command, tempFile);
+                }
+                command = `ns.sleeve.setToGymWorkout(${i}, "Powerhouse Gym", "def")`;
+            } else if(sleeveStats.dexterity < 100){
+                designatedTask = `training dexterity`;
+                if(sleeveCity != "Sector-12"){
+                    command = `ns.sleeve.travel(${i}, "Sector-12")`;
+                    await getNsDataThroughFile(ns, command, tempFile);
+                }
+                command = `ns.sleeve.setToGymWorkout(${i}, "Powerhouse Gym", "dex")`;
+            } else if(sleeveStats.agility < 100){
+                designatedTask = `training agility`;
+                if(sleeveCity != "Sector-12"){
+                    command = `ns.sleeve.travel(${i}, "Sector-12")`;
+                    await getNsDataThroughFile(ns, command, tempFile);
+                }
+                command = `ns.sleeve.setToGymWorkout(${i}, "Powerhouse Gym", "agi")`;
+            } else if(!ns.gang.inGang){
+                designatedTask = `commit homicide to farm karma`;
+                command = `ns.sleeve.setToCommitCrime(${i}, 'homicide')`;
             }
             else if (shock > 0 && options['shock-recovery'] > 0 && Math.random() < options['shock-recovery']) { // Recover from shock
                 designatedTask = "recover from shock";
@@ -98,8 +125,9 @@ export async function main(ns) {
                 designatedTask = `work for company '${playerInfo.companyName}'`;
                 command = `ns.sleeve.setToCompanyWork(${i}, '${playerInfo.companyName}')`;
             } else { // Do something productive
-                designatedTask = 'Taking Algorithms course at ZB Institute of Technology';
-                command = `ns.sleeve.setToUniversityCourse(${i}, 'ZB Institute of Technology', 'Algorithms')`;
+                let crime = options.crime || (sleeveStats.strength < 100 ? 'mug' : 'homicide');
+                designatedTask = `commit ${crime}`;
+                command = `ns.sleeve.setToCommitCrime(${i}, '${crime}')`;
             }
             // Don't change tasks if we've changed tasks recently
             if (Date.now() - (lastReassign[i] || 0) < minTaskWorkTime || task[i] == designatedTask) continue;
