@@ -120,7 +120,7 @@ export async function main(ns) {
     if (desiredAugStats.length > 0) ns.print(`--desired-stats matching: ${desiredAugStats.join(", ")}`);
     if (fastCrimesOnly) ns.print(`--fast-crimes-only`);
 
-
+    ns.print('Checking source files.')
     let dictSourceFiles = await getActiveSourceFiles(ns); // Find out what source files the user has unlocked
     if (!(4 in dictSourceFiles))
         return ns.tprint("ERROR: You cannot automate working for factions until you have unlocked singularity access (SF4).");
@@ -145,12 +145,14 @@ export async function main(ns) {
     }
 
     // Get some augmentation information to decide what remains to be purchased
+    ns.print('Getting faction augmentation data.')
     const dictFactionAugs = await getNsDataThroughFile(ns, dictCommand(factions, 'ns.getAugmentationsFromFaction(o)'), '/Temp/faction-augs.txt');
     const augmentationNames = [...new Set(Object.values(dictFactionAugs).flat())];
     const dictAugRepReqs = await getNsDataThroughFile(ns, dictCommand(augmentationNames, 'ns.getAugmentationRepReq(o)'), '/Temp/aug-repreqs.txt');
     const dictAugStats = await getNsDataThroughFile(ns, dictCommand(augmentationNames, 'ns.getAugmentationStats(o)'), '/Temp/aug-stats.txt');
     dictFactionFavors = await getNsDataThroughFile(ns, dictCommand(factions, 'ns.getFactionFavor(o)'), '/Temp/faction-favor.txt');
 
+    ns.print('Getting player augmentation data.')
     ownedAugmentations = await getNsDataThroughFile(ns, `ns.getOwnedAugmentations(true)`, '/Temp/player-augs-purchased.txt');
     let installedAugmentations = await getNsDataThroughFile(ns, `ns.getOwnedAugmentations()`, '/Temp/player-augs-installed.txt');
     hasFocusPenaly = !installedAugmentations.includes("Neuroreceptor Management Implant"); // Check if we have an augmentation that lets us not have to focus at work (always nicer if we can background it)
@@ -159,14 +161,14 @@ export async function main(ns) {
     mostExpensiveAugByFaction = Object.fromEntries(factions.map(f => [f, dictFactionAugs[f]
         .filter(aug => !ownedAugmentations.includes(aug))
         .reduce((max, aug) => Math.max(max, dictAugRepReqs[aug]), -1)]));
-    //ns.print("Most expensive unowned aug by faction: " + JSON.stringify(mostExpensiveAugByFaction));
+    // ns.print("Most expensive unowned aug by faction: " + JSON.stringify(mostExpensiveAugByFaction));
     // TODO: Detect when the most expensive aug from two factions is the same - only need it from the first one. (Update lists and remove 'afforded' augs?)
     mostExpensiveDesiredAugByFaction = Object.fromEntries(factions.map(f => [f, dictFactionAugs[f]
         .filter(aug => !ownedAugmentations.includes(aug) && (Object.keys(dictAugStats[aug]).length == 0 || !desiredAugStats ||
             Object.keys(dictAugStats[aug]).some(key => desiredAugStats.some(stat => key.includes(stat)))))
         .reduce((max, aug) => Math.max(max, dictAugRepReqs[aug]), -1)]));
 
-    //ns.print("Most expensive desired aug by faction: " + JSON.stringify(mostExpensiveDesiredAugByFaction));
+    // ns.print("Most expensive desired aug by faction: " + JSON.stringify(mostExpensiveDesiredAugByFaction));
     let completedFactions = Object.keys(mostExpensiveAugByFaction).filter(fac => mostExpensiveAugByFaction[fac] == -1 && !factionSpecificConfigs.find(c => c.name == fac)?.forceUnlock);
     let skipFactions = skipFactionsConfig.concat(completedFactions);
     let softCompletedFactions = Object.keys(mostExpensiveDesiredAugByFaction).filter(fac => mostExpensiveDesiredAugByFaction[fac] == -1 &&

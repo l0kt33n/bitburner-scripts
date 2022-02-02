@@ -27,7 +27,9 @@ const maxGrowthRate = 1.0035;
 // Pad weaken thread counts to account for undershooting. (Shouldn't happen. And if this is a timing issue, padding won't help)
 const weakenThreadPadding = 0; //0.01;
 // The name given to purchased servers (should match what's in host-manager.js)
-const purchasedServersName = "daemon";
+const purchasedServerNames = ['Alpha(α)', 'Beta(β)', 'Gamma(γ)', 'Delta(Δ)', 'Epsilon(ε)', 'Zeta(ζ)', 'Eta(η)', 'Theta(θ)', 'Iota(ι)', 'Kappa(κ)', 'Lambda(λ)', 'Mu(μ)', 'Nu(ν)', 'Xi(ξ)', 'Omicron(ο)', 'Pi(π)', 'Rho(ρ)', 'Sigma(σ)', 'Tau(τ)', 'Upsilon(υ)', 'Phi(φ)', 'Chi(χ)', 'Psi(Ψ)', 'Omega(Ω)','Infinity(∞)'];
+// The name given to reserved corporate servers
+const corpServerName = 'Corp(©)';
 
 // The maximum current total RAM utilization before we stop attempting to schedule work for the next less profitable server. Can be used to reserve capacity.
 const maxUtilization = 0.95;
@@ -44,7 +46,7 @@ let queueDelay = 100; // the delay that it can take for a script to start, used 
 let maxBatches = 40; // the max number of batches this daemon will spool up to avoid running out of IRL ram (TODO: Stop wasting RAM by scheduling batches so far in advance. e.g. Grind XP while waiting for cycle start!)
 let maxTargets; // Initial value, will grow if there is an abundance of RAM
 let maxPreppingAtMaxTargets = 3; // The max servers we can prep when we're at our current max targets and have spare RAM
-// Allows some home ram to be reserved for ad-hoc terminal script running and when home is explicitly set as the "preferred server" for starting a helper 
+// Allows some home ram to be reserved for ad-hoc terminal script running and when home is explicitly set as the "preferred server" for starting a helper. Set the default in the argsSchema, below.
 let homeReservedRam = 32;
 
 // --- VARS ---
@@ -218,15 +220,15 @@ export async function main(ns) {
     // These scripts are started once and expected to run forever (or terminate themselves when no longer needed)
     asynchronousHelpers = [
         { name: "stats.js", shouldRun: () => ns.getServerMaxRam("home") >= 64 /* Don't waste precious RAM */ }, // Adds stats not usually in the HUD
-        { name: "hacknet-upgrade-manager.js", args: ["-c", "--max-payoff-time", "1h"] }, // Kickstart hash income by buying everything with up to 1h payoff time immediately
+        { name: "hacknet-upgrade-manager.js", args: ["-c", "--max-payoff-time", "1h", '--interval', 500] }, // Kickstart hash income by buying everything with up to 1h payoff time immediately
         { name: "stockmaster.js", args: ["--show-market-summary"], tail: true, shouldRun: () => playerStats.hasTixApiAccess }, // Start our stockmaster if we have the required stockmarket access
         { name: "gangs.js", tail: true, shouldRun: () => 2 in dictSourceFiles }, // Script to create manage our gang for us
         { name: "spend-hacknet-hashes.js", args: ["-v"], shouldRun: () => 9 in dictSourceFiles }, // Always have this running to make sure hashes aren't wasted
         { name: "sleeve.js", tail: true, shouldRun: () => 10 in dictSourceFiles }, // Script to create manage our sleeves for us
-        {
-            name: "work-for-factions.js", args: ['--fast-crimes-only', '--no-coding-contracts'],  // Singularity script to manage how we use our "focus" work.
-            shouldRun: () => 4 in dictSourceFiles && (ns.getServerMaxRam("home") >= 128 / (2 ** dictSourceFiles[4])) // Higher SF4 levels result in lower RAM requirements
-        },
+        // {
+        //     name: "work-for-factions.js", args: ['--fast-crimes-only', '--no-coding-contracts'],  // Singularity script to manage how we use our "focus" work.
+        //     shouldRun: () => 4 in dictSourceFiles && (ns.getServerMaxRam("home") >= 128 / (2 ** dictSourceFiles[4])) // Higher SF4 levels result in lower RAM requirements
+        // },
     ];
     asynchronousHelpers.forEach(helper => helper.name = getFilePath(helper.name));
     asynchronousHelpers.forEach(helper => helper.isLaunched = false);
@@ -243,7 +245,7 @@ export async function main(ns) {
         { interval: 31000, name: "/Tasks/ram-manager.js", shouldRun: () => 4 in dictSourceFiles && dictSourceFiles[4] >= 2 && !shouldReserveMoney() && (getTotalNetworkUtilization() > 0.85 || xpOnly) && shouldImproveHacking() },
         // Buy every hacknet upgrade with up to 4h payoff if it is less than 10% of our current money or 8h if it is less than 1% of our current money
         { interval: 32000, name: "hacknet-upgrade-manager.js", shouldRun: shouldUpgradeHacknet, args: () => ["-c", "--max-payoff-time", "4h", "--max-spend", ns.getServerMoneyAvailable("home") * 0.1] },
-        { interval: 33000, name: "hacknet-upgrade-manager.js", shouldRun: shouldUpgradeHacknet, args: () => ["-c", "--max-payoff-time", "8h", "--max-spend", ns.getServerMoneyAvailable("home") * 0.01] },
+        //{ interval: 33000, name: "hacknet-upgrade-manager.js", shouldRun: shouldUpgradeHacknet, args: () => ["-c", "--max-payoff-time", "8h", "--max-spend", ns.getServerMoneyAvailable("home") * 0.01] },
         // Don't start auto-joining factions until we're holding 1 billion (so coding contracts returning money is probably less critical) or we've joined one already
         {
             interval: 34000, name: "faction-manager.js", requiredServer: "home", args: ['--join-only'],
@@ -333,7 +335,7 @@ async function tryRunTool(ns, tool) {
     const runResult = await arbitraryExecution(ns, tool, 1, args, tool.requiredServer || "home"); // TODO: Allow actually requiring a server
     if (runResult) {
         runningOnServer = whichServerIsRunning(ns, tool.name, false);
-        if (verbose) log(`Ran tool: ${tool.name} on server ${runningOnServer}` + (args.length > 0 ? ` with args ${JSON.stringify(args)}` : ''));
+        if (verbose) log(`INFO: Ran tool: ${tool.name} on server ${runningOnServer}` + (args.length > 0 ? ` with args ${JSON.stringify(args)}` : ''));
         if (tool.tail === true) {
             log(`Tailing Tool: ${tool.name} on server ${runningOnServer}` + (args.length > 0 ? ` with args ${JSON.stringify(args)}` : ''));
             ns.tail(tool.name, runningOnServer, ...args);
@@ -517,6 +519,7 @@ async function doTargetingLoop(ns) {
             // If we've been at low utilization for longer than the cycle of all our targets, we can add a target
             let intervalsPerTargetCycle = targeting.length == 0 ? 120 :
                 Math.ceil((targeting.reduce((max, t) => Math.max(max, t.timeToWeaken()), 0) + cycleTimingDelay) / loopInterval);
+
             //log(`intervalsPerTargetCycle: ${intervalsPerTargetCycle} lowUtilizationIterations: ${lowUtilizationIterations} loopInterval: ${loopInterval}`);
             if (lowUtilizationIterations > intervalsPerTargetCycle && skipped.length > 0 && maxTargets < serverListByTargetOrder.length) {
                 maxTargets++;
@@ -651,7 +654,7 @@ function buildServerObject(ns, node) {
         canHack: function () { return this.requiredHackLevel <= playerHackSkill(); },
         shouldHack: function () {
             return this.getMaxMoney() > 0 && this.name !== "home" && !this.name.startsWith('hacknet-node-') &&
-                !this.name.startsWith(purchasedServersName); // Hack, but beats wasting 2.25 GB on ns.getPurchasedServers()
+                !purchasedServerNames.includes( (nm) => this.name.startsWith(nm))
         },
         previouslyPrepped: false,
         prepRegressions: 0,
@@ -1077,6 +1080,7 @@ function getScheduleItem(description, toolShortName, start, end, threadsNeeded) 
 // If it can't run all the threads at once, it runs as many as it can across the spectrum of daemons available.
 /** @param {NS} ns **/
 export async function arbitraryExecution(ns, tool, threads, args, preferredServerName = null, useSmallestServerPossible = false) {
+    //ns.print(`running ${tool}, ${threads} threads with args ${JSON.stringify(args)} preferredServer: ${preferredServerName} smallest: ${useSmallestServerPossible}.`)
     // We will be using the list of servers that is sorted by most available ram
     sortServerList("ram");
     var rootedServersByFreeRam = serverListByFreeRam.filter(server => server.hasRoot() && server.totalRam() > 1.6);
@@ -1480,6 +1484,9 @@ function buildServerList(ns, verbose = false) {
     // Ignore hacknet node servers if we are not supposed to run scripts on them (reduces their hash rate when we do)
     if (!useHacknetNodes)
         allServers = allServers.filter(hostName => !hostName.startsWith('hacknet-node-'))
+    // If there's a dedicated corporate server, ignore that too.
+    if (corpServerName)
+        allServers = allServers.filter(hostName => !hostName.startsWith(corpServerName));
     // Remove all servers we currently have added that are no longer being returned by the above query
     for (const hostName of addedServerNames.filter(hostName => !allServers.includes(hostName)))
         removeServerByName(hostName);
