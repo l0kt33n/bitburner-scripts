@@ -20,10 +20,11 @@ const materials = [
     "AI Cores",
     "Real Estate",
 ];
-function checkForTAII(ns) {
+function checkForTAII(ns){
     let allHasTAII = true;
     const divisions = ns.corporation.getCorporation().divisions;
     for (const div of divisions) {
+        ns.tprint(div.name + ns.corporation.hasResearched(div.name, "Market-TA.II"))
         if (!ns.corporation.hasResearched(div.name, "Market-TA.II")) {
             allHasTAII = false;
             break;
@@ -40,6 +41,7 @@ export async function main(ns) {
 
     // Get some info about the corporation.
 
+    ns.tail();
     let whdata = new Map();
     let lastState = "";
     let corp = ns.corporation.getCorporation();
@@ -47,22 +49,22 @@ export async function main(ns) {
     while (!checkForTAII(ns)) {
         //ns.clearLog();
 
-        // if (corp.state === "START" && corp.state !== lastState) {
-        whdata = tuneMaterialSales(ns, whdata);
-        whdata = tuneProductSales(ns, whdata);
-        // }
+        if (corp.state === "START" && corp.state !== lastState) {
+            whdata = tuneMaterialSales(ns, whdata);
+            whdata = tuneProductSales(ns, whdata);
+        }
 
         let report = getDivisionReport(ns);
         for (const line of report) {
             ns.print(line);
         }
 
-        // ns.print(corp.state);
+        ns.print(corp.state);
         await ns.sleep(1000);
 
-        // if (corp.state !== lastState) {
-        //     lastState = corp.state;
-        // }
+        if (corp.state !== lastState) {
+            lastState = corp.state;
+        }
     }
 }
 
@@ -78,8 +80,8 @@ function tuneMaterialSales(ns, data) {
 
     // If we have < 100 of an item, increase the price. If we have > 200 of an item, decrease the price
     /*
-        Try to get the delta to 0, by selling exactly as many items as we produce for the maximum that people will spend.
-     */
+		Try to get the delta to 0, by selling exactly as many items as we produce for the maximum that people will spend.
+	 */
     const MIN = 100;
     const MAX = 500;
     const MP_DELTA = 0.005;
@@ -174,11 +176,11 @@ function tuneProductSales(ns, data) {
 
     // If we have < 100 of an item, increase the price. If we have > 200 of an item, decrease the price
     /*
-        Try to get the delta to 0, by selling exactly as many items as we produce for the maximum that people will spend.
-     */
+		Try to get the delta to 0, by selling exactly as many items as we produce for the maximum that people will spend.
+	 */
     const MIN = 100;
     const MAX = 200;
-    const MP_DELTA = 5;
+    const MP_DELTA = 10;
     // Let's go through the stuff we're selling, and see what's what.
     const divisions = ns.corporation.getCorporation().divisions;
     for (const div of divisions) {
@@ -209,7 +211,7 @@ function tuneProductSales(ns, data) {
                         .get(cities[0])
                         .get(material.name);
                     // This is something we're producing.
-                    let delta = material.prod - material.sell;
+                    let delta = material.prod - material.prod;
                     //ns.tprint(`${div.name}, ${city}, ${material.name}, Qty: ${nf(material.qty)} (${npsf(delta)}) Last price: ${last.toFixed(3)}`);
                     if (material.qty === 0) {
                         // We're selling everything down to 0. Give the price a boost.
