@@ -140,7 +140,7 @@ const argsSchema = [
     ['xp-only', false], // Same as above
     ['n', false], // Can toggle on using hacknet nodes for extra hacking ram (at the expense of hash production)
     ['use-hacknet-nodes', false], // Same as above
-    ['silent-misfires', false], // Instruct remote scripts not to alert when they misfire
+    ['silent-misfires', true], // Instruct remote scripts not to alert when they misfire
     ['initial-max-targets', 2], // Initial number of servers to target / prep (TODO: Scale this as BN progression increases)
     ['max-steal-percentage', 0.75], // Don't steal more than this in case something goes wrong with timing or scheduling, it's hard to recover from
     ['cycle-timing-delay', 16000], // Time 
@@ -221,10 +221,13 @@ export async function main(ns) {
     asynchronousHelpers = [
         { name: "stats.js", shouldRun: () => ns.getServerMaxRam("home") >= 64 /* Don't waste precious RAM */ }, // Adds stats not usually in the HUD
         { name: "hacknet-upgrade-manager.js", args: ["-c", "--max-payoff-time", "1h", '--interval', 500] }, // Kickstart hash income by buying everything with up to 1h payoff time immediately
-        { name: "stockmaster.js", args: ["--show-market-summary"], tail: true, shouldRun: () => playerStats.hasTixApiAccess }, // Start our stockmaster if we have the required stockmarket access
-        { name: "gangs.js", tail: true, shouldRun: () => 2 in dictSourceFiles }, // Script to create manage our gang for us
-        { name: "spend-hacknet-hashes.js", args: ["-v"], shouldRun: () => 9 in dictSourceFiles }, // Always have this running to make sure hashes aren't wasted
-        { name: "sleeve.js", tail: true, shouldRun: () => 10 in dictSourceFiles }, // Script to create manage our sleeves for us
+        { name: "stockmaster.js", shouldRun: () => playerStats.hasTixApiAccess }, // Start our stockmaster if we have the required stockmarket access
+        { name: "gangs.js", shouldRun: () => 2 in dictSourceFiles }, // Script to create manage our gang for us
+        { name: "spend-hacknet-hashes.js", args: ["-v"], shouldRun: () => (9 in dictSourceFiles &&  !playerStats.hasCorporation)}, // Always have this running to make sure hashes aren't wasted
+        { name: "sleeve.js", shouldRun: () => 10 in dictSourceFiles }, // Script to create manage our sleeves for us
+        { name: "corp-manager.js", shouldRun: () => playerStats.hasCorporation }, // Script to create manage our corp for us
+        { name: "corp-priceTuner.js", shouldRun: () => playerStats.hasCorporation }, // Script to create manage our corp for us
+        { name: "spend-hacknet-hashes.js", args: ["--spend-on", "Exchange_for_Corporation_Research", "-l", "-v"], shouldRun: () => playerStats.hasCorporation}, // Kickstart hash income by buying everything with up to 1h payoff time immediately
         // {
         //     name: "work-for-factions.js", args: ['--fast-crimes-only', '--no-coding-contracts'],  // Singularity script to manage how we use our "focus" work.
         //     shouldRun: () => 4 in dictSourceFiles && (ns.getServerMaxRam("home") >= 128 / (2 ** dictSourceFiles[4])) // Higher SF4 levels result in lower RAM requirements
