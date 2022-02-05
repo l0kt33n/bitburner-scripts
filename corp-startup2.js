@@ -1,21 +1,25 @@
-const CITIES = ["Aevum", "Chongqing", "Sector-12", "New Tokyo", "Ishima", "Volhaven"];
+const CITIES = [
+    "Aevum",
+    "Chongqing",
+    "Sector-12",
+    "New Tokyo",
+    "Ishima",
+    "Volhaven",
+];
 
-function setns(_ns) {
-    ns = _ns;
-}
-function cleanLogs() {
-    ns.disableLog("disableLog")
-    ns.disableLog("sleep")
-    ns.disableLog("exec")
-    ns.disableLog("getServerMaxRam")
-    ns.disableLog("getServerSecurityLevel")
-    ns.disableLog("getServerMinSecurityLevel")
-    ns.disableLog("getServerMaxMoney")
-    ns.disableLog("getHackingLevel")
-    ns.disableLog("getServerRequiredHackingLevel")
-    ns.disableLog("scan")
-    ns.disableLog("getServerMoneyAvailable")
-    ns.disableLog("getServerUsedRam")
+function cleanLogs(ns) {
+    ns.disableLog("disableLog");
+    ns.disableLog("sleep");
+    ns.disableLog("exec");
+    ns.disableLog("getServerMaxRam");
+    ns.disableLog("getServerSecurityLevel");
+    ns.disableLog("getServerMinSecurityLevel");
+    ns.disableLog("getServerMaxMoney");
+    ns.disableLog("getHackingLevel");
+    ns.disableLog("getServerRequiredHackingLevel");
+    ns.disableLog("scan");
+    ns.disableLog("getServerMoneyAvailable");
+    ns.disableLog("getServerUsedRam");
 }
 function stFormat(ns, ms, showms = true, showfull = false) {
     let timeLeft = ms;
@@ -28,24 +32,38 @@ function stFormat(ns, ms, showms = true, showfull = false) {
     let milliseconds = timeLeft;
 
     if (showms) {
-        if (hours > 0 || showfull) return ns.sprintf("%02d:%02d:%02d.%03d", hours, minutes, seconds, milliseconds);
-        if (minutes > 0) return ns.sprintf("%02d:%02d.%03d", minutes, seconds, milliseconds);
+        if (hours > 0 || showfull)
+            return ns.sprintf(
+                "%02d:%02d:%02d.%03d",
+                hours,
+                minutes,
+                seconds,
+                milliseconds
+            );
+        if (minutes > 0)
+            return ns.sprintf("%02d:%02d.%03d", minutes, seconds, milliseconds);
         return ns.sprintf("%02d.%03d", seconds, milliseconds);
     } else {
-        if (hours > 0 || showfull) return ns.sprintf("%02d:%02d:%02d", hours, minutes, seconds);
+        if (hours > 0 || showfull)
+            return ns.sprintf("%02d:%02d:%02d", hours, minutes, seconds);
         if (minutes > 0) return ns.sprintf("%02d:%02d", minutes, seconds);
         return ns.sprintf("%02d", seconds);
     }
 }
 
 function doLog(ns, str, ...args) {
-    ns.print(ns.sprintf("%8s " + str, new Date().toLocaleTimeString("it-IT"), ...args));
+    ns.print(
+        ns.sprintf(
+            "%8s " + str,
+            new Date().toLocaleTimeString("it-IT"),
+            ...args
+        )
+    );
 }
 
 /** @param {import(".").NS } ns */
 export async function main(ns) {
-    setns(ns);
-    cleanLogs();
+    cleanLogs(ns);
 
     const agDivName = "Agriculture";
     const tbDivName = "Tobacco";
@@ -59,10 +77,19 @@ export async function main(ns) {
     }
 
     // open the Agriculture division
-    if (ns.corporation.getCorporation().divisions.find((div) => div.type === agDivName) === undefined) {
+    if (
+        ns.corporation
+            .getCorporation()
+            .divisions.find((div) => div.type === agDivName) === undefined
+    ) {
         let divCost = ns.corporation.getExpandIndustryCost(agDivName);
 
-        doLog(ns, "Starting %s division for %s", agDivName, ns.nFormat(divCost, "($0.000a)"));
+        doLog(
+            ns,
+            "Starting %s division for %s",
+            agDivName,
+            ns.nFormat(divCost, "($0.000a)")
+        );
 
         ns.corporation.expandIndustry(agDivName, agDivName);
     }
@@ -82,7 +109,12 @@ export async function main(ns) {
                     ns.nFormat(upgradeCost, "($0.000a)")
                 );
             } else {
-                doLog(ns, "Purchasing %s upgrade for %s", upgrade, ns.nFormat(upgradeCost, "($0.000a)"));
+                doLog(
+                    ns,
+                    "Purchasing %s upgrade for %s",
+                    upgrade,
+                    ns.nFormat(upgradeCost, "($0.000a)")
+                );
                 ns.corporation.unlockUpgrade(upgrade);
             }
         }
@@ -112,87 +144,203 @@ export async function main(ns) {
                 );
                 break;
             } else {
-                doLog(ns, "Purchasing %s upgrade for %s", upgrade, ns.nFormat(upgradeCost, "($0.000a)"));
+                doLog(
+                    ns,
+                    "Purchasing %s upgrade for %s",
+                    upgrade,
+                    ns.nFormat(upgradeCost, "($0.000a)")
+                );
                 ns.corporation.levelUpgrade(upgrade);
             }
         }
     }
-
-    // Check primary city's warehouse and upgrade to 500
-    const primaryCity = ns.corporation.getDivision(agDivName).cities[0];
-    if (!ns.corporation.hasWarehouse(agDivName, primaryCity)) {
-        doLog(ns, "ERROR: %s primary city %s does not have a warehouse", agDivName, primaryCity);
-        return;
-    }
-
-    while (ns.corporation.getWarehouse(agDivName, primaryCity).size < 500) {
-        let upgradeCost = ns.corporation.getUpgradeWarehouseCost(agDivName, primaryCity);
+    // Expand to additional cities
+    for (const city of CITIES.filter(
+        (a) => !ns.corporation.getDivision(agDivName).cities.includes(a)
+    )) {
+        let expandCost = ns.corporation.getExpandCityCost();
         let corpFunds = ns.corporation.getCorporation().funds;
-        let startSize = ns.corporation.getWarehouse(agDivName, primaryCity).size;
 
-        if (corpFunds < upgradeCost) {
+        if (corpFunds < expandCost) {
             doLog(
                 ns,
-                "WARNING: Insufficient funds to purchase a warehouse upgrade %s < %s",
-                ns.nFormat(corpFunds, "($0.000a)"),
-                ns.nFormat(upgradeCost, "($0.000a)")
-            );
-        } else {
-            ns.corporation.upgradeWarehouse(agDivName, primaryCity);
-            let endSize = ns.corporation.getWarehouse(agDivName, primaryCity).size;
-            doLog(
-                ns,
-                "Upgraded %s %s's warehouse size from %s to %s for %s",
+                "ERROR: Insufficient funds to expand %s to %s %s < %s",
                 agDivName,
-                primaryCity,
-                ns.nFormat(startSize, "(0.000a)"),
-                ns.nFormat(endSize, "(0.000a)"),
-                ns.nFormat(upgradeCost, "($0.000a)")
+                city,
+                ns.nFormat(corpFunds, "($0.000a)"),
+                ns.nFormat(expandCost, "($0.000a)")
             );
+
+            return;
+        } else {
+            doLog(
+                ns,
+                "Expanding %s to %s for %s",
+                agDivName,
+                city,
+                ns.nFormat(expandCost, "($0.000a)")
+            );
+            ns.corporation.expandCity(agDivName, city);
+            await ns.sleep(100)
+            ns.corporation.purchaseWarehouse(agDivName, city);
+            await ns.sleep(100)
         }
     }
+    // Buy warehouses in all cities
+    for (const city of ns.corporation.getDivision(agDivName).cities) {
+        if (!ns.corporation.hasWarehouse(agDivName, city)) {
+            let warehouseCost = ns.corporation.getPurchaseWarehouseCost();
+            let corpFunds = ns.corporation.getCorporation().funds;
 
-    if (ns.corporation.getWarehouse(agDivName, primaryCity).size < 500) {
-        doLog(
-            ns,
-            "ERROR: %s primary city %s's warehouse is too small %d < 500",
+            if (warehouseCost <= corpFunds) {
+                doLog(
+                    ns,
+                    "Purchasing a %s warehouse in %s for %s",
+                    agDivName,
+                    city,
+                    ns.nFormat(warehouseCost, "($0.000a)")
+                );
+                ns.corporation.purchaseWarehouse(agDivName, city);
+                await ns.sleep(100)
+            } else {
+                doLog(
+                    ns,
+                    "Insufficient funds to purchase a %s warehouse in %s %s < %s",
+                    agDivName,
+                    city,
+                    ns.nFormat(corpFunds, "($0.000a)"),
+                    ns.nFormat(warehouseCost, "($0.000a)")
+                );
+                return;
+            }
+        }
+        // upgrade the size of the warehouses in all of the cities to 300
+        while (ns.corporation.getWarehouse(agDivName, city).size < 300) {
+            let upgradeCost = ns.corporation.getUpgradeWarehouseCost(
+                agDivName,
+                city
+            );
+            let corpFunds = ns.corporation.getCorporation().funds;
+            let startSize = ns.corporation.getWarehouse(agDivName, city).size;
+
+            if (corpFunds < upgradeCost) {
+                doLog(
+                    ns,
+                    "WARNING: Insufficient funds to purchase a warehouse upgrade %s < %s",
+                    ns.nFormat(corpFunds, "($0.000a)"),
+                    ns.nFormat(upgradeCost, "($0.000a)")
+                );
+            } else {
+                ns.corporation.upgradeWarehouse(agDivName, city);
+                let endSize = ns.corporation.getWarehouse(agDivName, city).size;
+                doLog(
+                    ns,
+                    "Upgraded %s %s's warehouse size from %s to %s for %s",
+                    agDivName,
+                    city,
+                    ns.nFormat(startSize, "(0.000a)"),
+                    ns.nFormat(endSize, "(0.000a)"),
+                    ns.nFormat(upgradeCost, "($0.000a)")
+                );
+            }
+        }
+        ns.corporation.setSmartSupply(agDivName, city, true);
+        ns.corporation.sellMaterial(agDivName, city, "Food", "0", "MP");
+        ns.corporation.sellMaterial(agDivName, city, "Plants", "0", "MP");
+
+        while (ns.corporation.getOffice(agDivName, city).employees.length < 3) {
+            ns.corporation.hireEmployee(agDivName, city);
+        }
+
+        for (const employee of ns.corporation.getOffice(agDivName, city)
+            .employees)
+            ns.corporation.assignJob(agDivName, city, employee, "Unassigned");
+
+        await ns.corporation.setAutoJobAssignment(
             agDivName,
-            primaryCity,
-            ns.corporation.getWarehouse(agDivName, primaryCity).size
+            city,
+            "Operations",
+            1
+        );
+        await ns.corporation.setAutoJobAssignment(
+            agDivName,
+            city,
+            "Engineer",
+            1
+        );
+        await ns.corporation.setAutoJobAssignment(
+            agDivName,
+            city,
+            "Business",
+            1
         );
 
-        return;
+        // buy production materials for all cities
+        for (const city of ns.corporation.getDivision(agDivName).cities) {
+            if (
+                ns.corporation.getMaterial(agDivName, city, "Real Estate")
+                    .qty === 0
+            ) {
+                ns.corporation.buyMaterial(agDivName, city, "Hardware", 12.5);
+                ns.corporation.buyMaterial(agDivName, city, "AI Cores", 7.5);
+                ns.corporation.buyMaterial(
+                    agDivName,
+                    city,
+                    "Real Estate",
+                    2700
+                );
+
+                while (
+                    ns.corporation.getMaterial(agDivName, city, "Real Estate")
+                        .qty === 0
+                )
+                    await ns.sleep(5);
+
+                doLog(
+                    ns,
+                    "Purchased Round 1 of %s production materials in %s",
+                    agDivName,
+                    city
+                );
+
+                ns.corporation.buyMaterial(agDivName, city, "Hardware", 0);
+                ns.corporation.buyMaterial(agDivName, city, "AI Cores", 0);
+                ns.corporation.buyMaterial(agDivName, city, "Real Estate", 0);
+            }
+        }
+
+        ns.corporation.setSmartSupply(agDivName, city, true);
     }
-
-    // buy production materials for primary city
-    if (ns.corporation.getMaterial(agDivName, primaryCity, "Real Estate").qty === 0) {
-        ns.corporation.buyMaterial(agDivName, primaryCity, "Hardware", 12.5);
-        ns.corporation.buyMaterial(agDivName, primaryCity, "AI Cores", 7.5);
-        ns.corporation.buyMaterial(agDivName, primaryCity, "Real Estate", 2700);
-
-        while (ns.corporation.getMaterial(agDivName, primaryCity, "Real Estate").qty === 0) await ns.sleep(5);
-
-        doLog(ns, "Purchased Round 1 of %s production materials in %s", agDivName, primaryCity);
-
-        ns.corporation.buyMaterial(agDivName, primaryCity, "Hardware", 0);
-        ns.corporation.buyMaterial(agDivName, primaryCity, "AI Cores", 0);
-        ns.corporation.buyMaterial(agDivName, primaryCity, "Real Estate", 0);
-    }
-
-    ns.corporation.setSmartSupply(agDivName, primaryCity, true);
 
     // Attempt to get first round of funding
     while (ns.corporation.getInvestmentOffer().round < 2) {
-        doLog(ns, "Investment round 1: waiting for %s %s warehouse to fill", agDivName, primaryCity);
+        let primaryCity = CITIES[0];
+        doLog(
+            ns,
+            "Investment round 1: waiting for %s %s warehouse to fill",
+            agDivName,
+            primaryCity
+        );
 
         // Sell plants but not food (food is more expensive per unit)
-        ns.corporation.sellMaterial(agDivName, primaryCity, "Food", "0", "MP");
-        ns.corporation.sellMaterial(agDivName, primaryCity, "Plants", "0", "MP");
+        for (const city of ns.corporation.getDivision(agDivName).cities) {
+            ns.corporation.sellMaterial(agDivName, city, "Food", "0", "MP");
+            ns.corporation.sellMaterial(agDivName, city, "Plants", "0", "MP");
+        }
 
-        while (
-            ns.corporation.getWarehouse(agDivName, primaryCity).sizeUsed <
-            ns.corporation.getWarehouse(agDivName, primaryCity).size * 0.95
-        ) {
+        while (true) {
+            let doBreak = true;
+            for (const city of ns.corporation.getDivision(agDivName).cities) {
+                if (
+                    ns.corporation.getWarehouse(agDivName, city).sizeUsed <
+                    ns.corporation.getWarehouse(agDivName, city).size * 0.95
+                ) {
+                    doBreak = false;
+                    break;
+                }
+            }
+
+            if (doBreak) break;
             await ns.sleep(1000);
         }
 
@@ -203,12 +351,27 @@ export async function main(ns) {
             primaryCity
         );
 
-        ns.corporation.sellMaterial(agDivName, primaryCity, "Food", "MAX", "MP*1");
-        ns.corporation.sellMaterial(agDivName, primaryCity, "Plants", "MAX", "MP*1");
-
+        for (const city of ns.corporation.getDivision(agDivName).cities) {
+            ns.corporation.sellMaterial(
+                agDivName,
+                city,
+                "Food",
+                "MAX",
+                "MP*0.9"
+            );
+            ns.corporation.sellMaterial(
+                agDivName,
+                city,
+                "Plants",
+                "MAX",
+                "MP*0.9"
+            );
+        }
         let tookOffer = false;
         let bestOffer = ns.corporation.getInvestmentOffer();
-        while (ns.corporation.getWarehouse(agDivName, primaryCity).sizeUsed > 151) {
+        while (
+            ns.corporation.getWarehouse(agDivName, primaryCity).sizeUsed > 151
+        ) {
             let offer = ns.corporation.getInvestmentOffer();
 
             // only take offers over $335b
@@ -261,31 +424,14 @@ export async function main(ns) {
                 );
                 return;
             } else {
-                doLog(ns, "Purchasing %s upgrade for %s", upgrade, ns.nFormat(upgradeCost, "($0.000a)"));
+                doLog(
+                    ns,
+                    "Purchasing %s upgrade for %s",
+                    upgrade,
+                    ns.nFormat(upgradeCost, "($0.000a)")
+                );
                 ns.corporation.unlockUpgrade(upgrade);
             }
-        }
-    }
-
-    // Expand to additional cities
-    for (const city of CITIES.filter((a) => !ns.corporation.getDivision(agDivName).cities.includes(a))) {
-        let expandCost = ns.corporation.getExpandCityCost();
-        let corpFunds = ns.corporation.getCorporation().funds;
-
-        if (corpFunds < expandCost) {
-            doLog(
-                ns,
-                "ERROR: Insufficient funds to expand %s to %s %s < %s",
-                agDivName,
-                city,
-                ns.nFormat(corpFunds, "($0.000a)"),
-                ns.nFormat(expandCost, "($0.000a)")
-            );
-
-            return;
-        } else {
-            doLog(ns, "Expanding %s to %s for %s", agDivName, city, ns.nFormat(expandCost, "($0.000a)"));
-            ns.corporation.expandCity(agDivName, city);
         }
     }
 
@@ -319,7 +465,10 @@ export async function main(ns) {
 
         // upgrade the size of the warehouses in all of the cities to 500
         while (ns.corporation.getWarehouse(agDivName, city).size < 500) {
-            let upgradeCost = ns.corporation.getUpgradeWarehouseCost(agDivName, city);
+            let upgradeCost = ns.corporation.getUpgradeWarehouseCost(
+                agDivName,
+                city
+            );
             let corpFunds = ns.corporation.getCorporation().funds;
             let startSize = ns.corporation.getWarehouse(agDivName, city).size;
 
@@ -382,33 +531,74 @@ export async function main(ns) {
                 city,
                 ns.nFormat(upgradeCost, "($0.000a)")
             );
-            ns.corporation.upgradeOfficeSize(agDivName, city, 9 - ns.corporation.getOffice(agDivName, city).size);
+            ns.corporation.upgradeOfficeSize(
+                agDivName,
+                city,
+                9 - ns.corporation.getOffice(agDivName, city).size
+            );
         }
 
         while (ns.corporation.getOffice(agDivName, city).employees.length < 9) {
             ns.corporation.hireEmployee(agDivName, city);
         }
 
-        for (const employee of ns.corporation.getOffice(agDivName, city).employees)
+        for (const employee of ns.corporation.getOffice(agDivName, city)
+            .employees)
             ns.corporation.assignJob(agDivName, city, employee, "Unassigned");
 
-        await ns.corporation.setAutoJobAssignment(agDivName, city, "Operations", 2);
-        await ns.corporation.setAutoJobAssignment(agDivName, city, "Engineer", 2);
-        await ns.corporation.setAutoJobAssignment(agDivName, city, "Business", 1);
-        await ns.corporation.setAutoJobAssignment(agDivName, city, "Management", 2);
-        await ns.corporation.setAutoJobAssignment(agDivName, city, "Research & Development", 2);
+        await ns.corporation.setAutoJobAssignment(
+            agDivName,
+            city,
+            "Operations",
+            2
+        );
+        await ns.corporation.setAutoJobAssignment(
+            agDivName,
+            city,
+            "Engineer",
+            2
+        );
+        await ns.corporation.setAutoJobAssignment(
+            agDivName,
+            city,
+            "Business",
+            1
+        );
+        await ns.corporation.setAutoJobAssignment(
+            agDivName,
+            city,
+            "Management",
+            2
+        );
+        await ns.corporation.setAutoJobAssignment(
+            agDivName,
+            city,
+            "Research & Development",
+            2
+        );
     }
 
     // buy production materials for all cities
     for (const city of ns.corporation.getDivision(agDivName).cities) {
-        if (ns.corporation.getMaterial(agDivName, city, "Real Estate").qty === 0) {
+        if (
+            ns.corporation.getMaterial(agDivName, city, "Real Estate").qty === 0
+        ) {
             ns.corporation.buyMaterial(agDivName, city, "Hardware", 12.5);
             ns.corporation.buyMaterial(agDivName, city, "AI Cores", 7.5);
             ns.corporation.buyMaterial(agDivName, city, "Real Estate", 2700);
 
-            while (ns.corporation.getMaterial(agDivName, city, "Real Estate").qty === 0) await ns.sleep(5);
+            while (
+                ns.corporation.getMaterial(agDivName, city, "Real Estate")
+                    .qty === 0
+            )
+                await ns.sleep(5);
 
-            doLog(ns, "Purchased Round 1 of %s production materials in %s", agDivName, city);
+            doLog(
+                ns,
+                "Purchased Round 1 of %s production materials in %s",
+                agDivName,
+                city
+            );
 
             ns.corporation.buyMaterial(agDivName, city, "Hardware", 0);
             ns.corporation.buyMaterial(agDivName, city, "AI Cores", 0);
@@ -433,7 +623,12 @@ export async function main(ns) {
                 );
                 break;
             } else {
-                doLog(ns, "Purchasing %s upgrade for %s", upgrade, ns.nFormat(upgradeCost, "($0.000a)"));
+                doLog(
+                    ns,
+                    "Purchasing %s upgrade for %s",
+                    upgrade,
+                    ns.nFormat(upgradeCost, "($0.000a)")
+                );
                 ns.corporation.levelUpgrade(upgrade);
             }
         }
@@ -442,7 +637,10 @@ export async function main(ns) {
     // Increase Warehouse Sizes to 2k
     for (const city of ns.corporation.getDivision(agDivName).cities) {
         while (ns.corporation.getWarehouse(agDivName, city).size < 2000) {
-            let upgradeCost = ns.corporation.getUpgradeWarehouseCost(agDivName, city);
+            let upgradeCost = ns.corporation.getUpgradeWarehouseCost(
+                agDivName,
+                city
+            );
             let corpFunds = ns.corporation.getCorporation().funds;
             let startSize = ns.corporation.getWarehouse(agDivName, city).size;
 
@@ -471,15 +669,27 @@ export async function main(ns) {
 
     // buy second round production materials for all cities
     for (const city of ns.corporation.getDivision(agDivName).cities) {
-        if (ns.corporation.getMaterial(agDivName, city, "Real Estate").qty < 140000) {
+        if (
+            ns.corporation.getMaterial(agDivName, city, "Real Estate").qty <
+            140000
+        ) {
             ns.corporation.buyMaterial(agDivName, city, "Hardware", 267.5);
             ns.corporation.buyMaterial(agDivName, city, "Robots", 9.6);
             ns.corporation.buyMaterial(agDivName, city, "AI Cores", 244.5);
             ns.corporation.buyMaterial(agDivName, city, "Real Estate", 11940);
 
-            while (ns.corporation.getMaterial(agDivName, city, "Real Estate").qty < 140000) await ns.sleep(5);
+            while (
+                ns.corporation.getMaterial(agDivName, city, "Real Estate").qty <
+                140000
+            )
+                await ns.sleep(5);
 
-            doLog(ns, "Purchased Round 2 of %s production materials in %s", agDivName, city);
+            doLog(
+                ns,
+                "Purchased Round 2 of %s production materials in %s",
+                agDivName,
+                city
+            );
 
             ns.corporation.buyMaterial(agDivName, city, "Hardware", 0);
             ns.corporation.buyMaterial(agDivName, city, "Robots", 0);
@@ -490,7 +700,11 @@ export async function main(ns) {
 
     // Attempt to get second round of funding
     while (ns.corporation.getInvestmentOffer().round < 3) {
-        doLog(ns, "Investment round 2: waiting for %s warehouses to fill", agDivName);
+        doLog(
+            ns,
+            "Investment round 2: waiting for %s warehouses to fill",
+            agDivName
+        );
 
         // Sell plants but not food (food is more expensive per unit)
         for (const city of ns.corporation.getDivision(agDivName).cities) {
@@ -521,13 +735,27 @@ export async function main(ns) {
         );
 
         for (const city of ns.corporation.getDivision(agDivName).cities) {
-            ns.corporation.sellMaterial(agDivName, city, "Food", "MAX", "MP*0.9");
-            ns.corporation.sellMaterial(agDivName, city, "Plants", "MAX", "MP*0.9");
+            ns.corporation.sellMaterial(
+                agDivName,
+                city,
+                "Food",
+                "MAX",
+                "MP*0.9"
+            );
+            ns.corporation.sellMaterial(
+                agDivName,
+                city,
+                "Plants",
+                "MAX",
+                "MP*0.9"
+            );
         }
 
         let tookOffer = false;
         let bestOffer = ns.corporation.getInvestmentOffer();
-        while (ns.corporation.getWarehouse(agDivName, primaryCity).sizeUsed > 1250) {
+        while (
+            ns.corporation.getWarehouse(agDivName, primaryCity).sizeUsed > 1250
+        ) {
             let offer = ns.corporation.getInvestmentOffer();
 
             //only take offers over $10t
@@ -563,7 +791,10 @@ export async function main(ns) {
     // Increase Warehouse Sizes to 3.8k
     for (const city of ns.corporation.getDivision(agDivName).cities) {
         while (ns.corporation.getWarehouse(agDivName, city).size < 3800) {
-            let upgradeCost = ns.corporation.getUpgradeWarehouseCost(agDivName, city);
+            let upgradeCost = ns.corporation.getUpgradeWarehouseCost(
+                agDivName,
+                city
+            );
             let corpFunds = ns.corporation.getCorporation().funds;
             let startSize = ns.corporation.getWarehouse(agDivName, city).size;
 
@@ -592,15 +823,27 @@ export async function main(ns) {
 
     // buy third round production materials for all cities
     for (const city of ns.corporation.getDivision(agDivName).cities) {
-        if (ns.corporation.getMaterial(agDivName, city, "Real Estate").qty < 230000) {
+        if (
+            ns.corporation.getMaterial(agDivName, city, "Real Estate").qty <
+            230000
+        ) {
             ns.corporation.buyMaterial(agDivName, city, "Hardware", 650);
             ns.corporation.buyMaterial(agDivName, city, "Robots", 63);
             ns.corporation.buyMaterial(agDivName, city, "AI Cores", 375);
             ns.corporation.buyMaterial(agDivName, city, "Real Estate", 8400);
 
-            while (ns.corporation.getMaterial(agDivName, city, "Real Estate").qty < 230000) await ns.sleep(5);
+            while (
+                ns.corporation.getMaterial(agDivName, city, "Real Estate").qty <
+                230000
+            )
+                await ns.sleep(5);
 
-            doLog(ns, "Purchased Round 3 of %s production materials in %s", agDivName, city);
+            doLog(
+                ns,
+                "Purchased Round 3 of %s production materials in %s",
+                agDivName,
+                city
+            );
 
             ns.corporation.buyMaterial(agDivName, city, "Hardware", 0);
             ns.corporation.buyMaterial(agDivName, city, "Robots", 0);
@@ -610,15 +853,26 @@ export async function main(ns) {
     }
 
     // open the Tobacco division
-    if (ns.corporation.getCorporation().divisions.find((div) => div.type === tbDivName) === undefined) {
+    if (
+        ns.corporation
+            .getCorporation()
+            .divisions.find((div) => div.type === tbDivName) === undefined
+    ) {
         let divCost = ns.corporation.getExpandIndustryCost(tbDivName);
-        doLog(ns, "Starting %s division for %s", tbDivName, ns.nFormat(divCost, "($0.000a)"));
+        doLog(
+            ns,
+            "Starting %s division for %s",
+            tbDivName,
+            ns.nFormat(divCost, "($0.000a)")
+        );
 
         ns.corporation.expandIndustry(tbDivName, tbDivName);
     }
 
     // Expand to additional cities
-    for (const city of CITIES.filter((a) => !ns.corporation.getDivision(tbDivName).cities.includes(a))) {
+    for (const city of CITIES.filter(
+        (a) => !ns.corporation.getDivision(tbDivName).cities.includes(a)
+    )) {
         let expandCost = ns.corporation.getExpandCityCost();
         let corpFunds = ns.corporation.getCorporation().funds;
 
@@ -634,7 +888,13 @@ export async function main(ns) {
 
             return;
         } else {
-            doLog(ns, "Expanding %s to %s for %s", tbDivName, city, ns.nFormat(expandCost, "($0.000a)"));
+            doLog(
+                ns,
+                "Expanding %s to %s for %s",
+                tbDivName,
+                city,
+                ns.nFormat(expandCost, "($0.000a)")
+            );
             ns.corporation.expandCity(tbDivName, city);
         }
     }
@@ -669,7 +929,10 @@ export async function main(ns) {
 
         // upgrade the size of the warehouses in all of the cities to 1000
         while (ns.corporation.getWarehouse(tbDivName, city).size < 1000) {
-            let upgradeCost = ns.corporation.getUpgradeWarehouseCost(tbDivName, city);
+            let upgradeCost = ns.corporation.getUpgradeWarehouseCost(
+                tbDivName,
+                city
+            );
             let corpFunds = ns.corporation.getCorporation().funds;
             let startSize = ns.corporation.getWarehouse(tbDivName, city).size;
 
@@ -730,19 +993,55 @@ export async function main(ns) {
                 city,
                 ns.nFormat(upgradeCost, "($0.000a)")
             );
-            ns.corporation.upgradeOfficeSize(tbDivName, city, 10 - ns.corporation.getOffice(tbDivName, city).size);
+            ns.corporation.upgradeOfficeSize(
+                tbDivName,
+                city,
+                10 - ns.corporation.getOffice(tbDivName, city).size
+            );
         }
 
-        while (ns.corporation.getOffice(tbDivName, city).employees.length < 10) {
+        while (
+            ns.corporation.getOffice(tbDivName, city).employees.length < 10
+        ) {
             ns.corporation.hireEmployee(tbDivName, city);
         }
 
-        await ns.corporation.setAutoJobAssignment(tbDivName, city, "Unassigned", 2);
-        await ns.corporation.setAutoJobAssignment(tbDivName, city, "Operations", 2);
-        await ns.corporation.setAutoJobAssignment(tbDivName, city, "Engineer", 2);
-        await ns.corporation.setAutoJobAssignment(tbDivName, city, "Business", 2);
-        await ns.corporation.setAutoJobAssignment(tbDivName, city, "Management", 2);
-        await ns.corporation.setAutoJobAssignment(tbDivName, city, "Research & Development", 2);
+        await ns.corporation.setAutoJobAssignment(
+            tbDivName,
+            city,
+            "Unassigned",
+            2
+        );
+        await ns.corporation.setAutoJobAssignment(
+            tbDivName,
+            city,
+            "Operations",
+            2
+        );
+        await ns.corporation.setAutoJobAssignment(
+            tbDivName,
+            city,
+            "Engineer",
+            2
+        );
+        await ns.corporation.setAutoJobAssignment(
+            tbDivName,
+            city,
+            "Business",
+            2
+        );
+        await ns.corporation.setAutoJobAssignment(
+            tbDivName,
+            city,
+            "Management",
+            2
+        );
+        await ns.corporation.setAutoJobAssignment(
+            tbDivName,
+            city,
+            "Research & Development",
+            2
+        );
     }
 
     // Upgrade Aevum office to 30 employees
@@ -780,18 +1079,51 @@ export async function main(ns) {
             );
         }
 
-        while (ns.corporation.getOffice(tbDivName, tbRDCity).employees.length < 30) {
+        while (
+            ns.corporation.getOffice(tbDivName, tbRDCity).employees.length < 30
+        ) {
             ns.corporation.hireEmployee(tbDivName, tbRDCity);
         }
 
-        for (const employee of ns.corporation.getOffice(tbDivName, tbRDCity).employees)
-            ns.corporation.assignJob(tbDivName, tbRDCity, employee, "Unassigned");
+        for (const employee of ns.corporation.getOffice(tbDivName, tbRDCity)
+            .employees)
+            ns.corporation.assignJob(
+                tbDivName,
+                tbRDCity,
+                employee,
+                "Unassigned"
+            );
 
-        await ns.corporation.setAutoJobAssignment(tbDivName, tbRDCity, "Operations", 6);
-        await ns.corporation.setAutoJobAssignment(tbDivName, tbRDCity, "Engineer", 6);
-        await ns.corporation.setAutoJobAssignment(tbDivName, tbRDCity, "Business", 6);
-        await ns.corporation.setAutoJobAssignment(tbDivName, tbRDCity, "Management", 6);
-        await ns.corporation.setAutoJobAssignment(tbDivName, tbRDCity, "Research & Development", 6);
+        await ns.corporation.setAutoJobAssignment(
+            tbDivName,
+            tbRDCity,
+            "Operations",
+            6
+        );
+        await ns.corporation.setAutoJobAssignment(
+            tbDivName,
+            tbRDCity,
+            "Engineer",
+            6
+        );
+        await ns.corporation.setAutoJobAssignment(
+            tbDivName,
+            tbRDCity,
+            "Business",
+            6
+        );
+        await ns.corporation.setAutoJobAssignment(
+            tbDivName,
+            tbRDCity,
+            "Management",
+            6
+        );
+        await ns.corporation.setAutoJobAssignment(
+            tbDivName,
+            tbRDCity,
+            "Research & Development",
+            6
+        );
     }
 
     leveledUpgrades = [
@@ -815,7 +1147,12 @@ export async function main(ns) {
                 );
                 break;
             } else {
-                doLog(ns, "Purchasing %s upgrade for %s", upgrade, ns.nFormat(upgradeCost, "($0.000a)"));
+                doLog(
+                    ns,
+                    "Purchasing %s upgrade for %s",
+                    upgrade,
+                    ns.nFormat(upgradeCost, "($0.000a)")
+                );
                 ns.corporation.levelUpgrade(upgrade);
             }
         }
@@ -828,7 +1165,9 @@ export async function main(ns) {
     // initialize product tracker
     ns.corporation
         .getDivision(tbDivName)
-        .products.map((prodname) => ns.corporation.getProduct(tbDivName, prodname))
+        .products.map((prodname) =>
+            ns.corporation.getProduct(tbDivName, prodname)
+        )
         .forEach((product) => {
             let mult = Number(product.sCost.slice(3));
             productTracker[product.name] = {
@@ -854,8 +1193,12 @@ export async function main(ns) {
             doLog(ns, "Doing Update");
 
             // Attempt to max out Wilson Analytics
-            while (ns.corporation.getUpgradeLevelCost("Wilson Analytics") < ns.corporation.getCorporation().funds) {
-                let upgradeCost = ns.corporation.getUpgradeLevelCost("Wilson Analytics");
+            while (
+                ns.corporation.getUpgradeLevelCost("Wilson Analytics") <
+                ns.corporation.getCorporation().funds
+            ) {
+                let upgradeCost =
+                    ns.corporation.getUpgradeLevelCost("Wilson Analytics");
                 doLog(
                     ns,
                     "Purchasing %s upgrade for %s",
@@ -879,7 +1222,10 @@ export async function main(ns) {
             for (const upgrade of leveledUpgrades) {
                 let upgradeCount = 0;
                 let upgradeCost = 0;
-                while (ns.corporation.getUpgradeLevelCost(upgrade) < ns.corporation.getCorporation().funds * 0.01) {
+                while (
+                    ns.corporation.getUpgradeLevelCost(upgrade) <
+                    ns.corporation.getCorporation().funds * 0.01
+                ) {
                     upgradeCost += ns.corporation.getUpgradeLevelCost(upgrade);
                     upgradeCount++;
                     ns.corporation.levelUpgrade(upgrade);
@@ -897,14 +1243,20 @@ export async function main(ns) {
             }
 
             let maxProducts = 3;
-            if (ns.corporation.hasResearched(tbDivName, "uPgrade: Capacity.I")) maxProducts++;
-            if (ns.corporation.hasResearched(tbDivName, "uPgrade: Capacity.II")) maxProducts++;
+            if (ns.corporation.hasResearched(tbDivName, "uPgrade: Capacity.I"))
+                maxProducts++;
+            if (ns.corporation.hasResearched(tbDivName, "uPgrade: Capacity.II"))
+                maxProducts++;
 
             // Develop a product if there are none in development
             let products = ns.corporation
                 .getDivision(tbDivName)
-                .products.map((prodname) => ns.corporation.getProduct(tbDivName, prodname))
-                .sort((a, b) => Number(a.name.slice(5)) - Number(b.name.slice(5)));
+                .products.map((prodname) =>
+                    ns.corporation.getProduct(tbDivName, prodname)
+                )
+                .sort(
+                    (a, b) => Number(a.name.slice(5)) - Number(b.name.slice(5))
+                );
 
             let productIsDeveloping = false;
             for (const product of products) {
@@ -917,21 +1269,38 @@ export async function main(ns) {
             // if there are no products in development, discontinue the oldest one if needed
             if (!productIsDeveloping) {
                 if (products.length === maxProducts) {
-                    doLog(ns, "Discontinuing %s product %s", tbDivName, products[0].name);
+                    doLog(
+                        ns,
+                        "Discontinuing %s product %s",
+                        tbDivName,
+                        products[0].name
+                    );
 
-                    ns.corporation.discontinueProduct(tbDivName, products[0].name);
+                    ns.corporation.discontinueProduct(
+                        tbDivName,
+                        products[0].name
+                    );
                 }
 
-                let investmentCash = ns.corporation.getCorporation().funds * 0.01;
+                let investmentCash =
+                    ns.corporation.getCorporation().funds * 0.01;
 
                 let productName = "prod-0";
                 let newMult = 1;
                 if (products.length > 0) {
-                    productName = "prod-" + (Number(products[products.length - 1].name.slice(5)) + 1).toString();
+                    productName =
+                        "prod-" +
+                        (
+                            Number(
+                                products[products.length - 1].name.slice(5)
+                            ) + 1
+                        ).toString();
                 }
 
                 if (products.length > 1) {
-                    newMult = Number(products[products.length - 2].sCost.slice(3));
+                    newMult = Number(
+                        products[products.length - 2].sCost.slice(3)
+                    );
                 }
 
                 doLog(
@@ -942,23 +1311,39 @@ export async function main(ns) {
                     ns.nFormat(investmentCash * 2, "($0.000a)")
                 );
 
-                ns.corporation.makeProduct(tbDivName, tbRDCity, productName, investmentCash, investmentCash);
-                ns.corporation.sellProduct(tbDivName, tbRDCity, productName, "MAX", "MP*" + newMult.toString(), true);
+                ns.corporation.makeProduct(
+                    tbDivName,
+                    tbRDCity,
+                    productName,
+                    investmentCash,
+                    investmentCash
+                );
+                ns.corporation.sellProduct(
+                    tbDivName,
+                    tbRDCity,
+                    productName,
+                    "MAX",
+                    "MP*" + newMult.toString(),
+                    true
+                );
             }
 
             products = ns.corporation
                 .getDivision(tbDivName)
-                .products.map((prodname) => ns.corporation.getProduct(tbDivName, prodname))
+                .products.map((prodname) =>
+                    ns.corporation.getProduct(tbDivName, prodname)
+                )
                 .sort((a, b) => Number(a.name) - Number(b.name));
 
             // mess with the price of products
             for (const product of products) {
-                if (product.developmentProgress < 100)
-                    continue
+                if (product.developmentProgress < 100) continue;
                 let mpMult = Number(product.sCost.slice(3));
                 let reduceMult = false;
                 let increaseMult = 0;
-                for (const [key, [qty, prod, sell]] of Object.entries(product.cityData)) {
+                for (const [key, [qty, prod, sell]] of Object.entries(
+                    product.cityData
+                )) {
                     const prodDeficit = prod - sell;
                     if (qty > prod * 20 && prodDeficit > 0) {
                         reduceMult = true;
@@ -972,7 +1357,13 @@ export async function main(ns) {
                     let oldmpMult = mpMult;
                     mpMult = Math.max(Math.floor(mpMult * 0.9), 1);
 
-                    doLog(ns, "Reducing %s mpMult %d => %d", product.name, oldmpMult, mpMult);
+                    doLog(
+                        ns,
+                        "Reducing %s mpMult %d => %d",
+                        product.name,
+                        oldmpMult,
+                        mpMult
+                    );
                     ns.corporation.sellProduct(
                         tbDivName,
                         tbRDCity,
@@ -981,12 +1372,20 @@ export async function main(ns) {
                         "MP*" + mpMult.toString(),
                         true
                     );
-                } else if (increaseMult === Object.keys(product.cityData).length) {
+                } else if (
+                    increaseMult === Object.keys(product.cityData).length
+                ) {
                     let oldmpMult = mpMult;
 
                     mpMult = Math.ceil(mpMult * 1.1);
 
-                    doLog(ns, "Increasing %s mpMult %d => %d", product.name, oldmpMult, mpMult);
+                    doLog(
+                        ns,
+                        "Increasing %s mpMult %d => %d",
+                        product.name,
+                        oldmpMult,
+                        mpMult
+                    );
                     ns.corporation.sellProduct(
                         tbDivName,
                         tbRDCity,
@@ -1022,11 +1421,17 @@ export async function main(ns) {
             let advertPrice = 0;
             while (true) {
                 let advertCost = ns.corporation.getHireAdVertCost(tbDivName);
-                let tbRDCityOfficeExpandCost = ns.corporation.getOfficeSizeUpgradeCost(tbDivName, tbRDCity, 15);
+                let tbRDCityOfficeExpandCost =
+                    ns.corporation.getOfficeSizeUpgradeCost(
+                        tbDivName,
+                        tbRDCity,
+                        15
+                    );
 
                 if (
                     advertCost > ns.corporation.getCorporation().funds * 0.5 &&
-                    tbRDCityOfficeExpandCost > ns.corporation.getCorporation().funds * 0.5
+                    tbRDCityOfficeExpandCost >
+                        ns.corporation.getCorporation().funds * 0.5
                 )
                     break;
 
@@ -1061,17 +1466,48 @@ export async function main(ns) {
                     tbRDCity,
                     ns.nFormat(officeSizePrice, "($0.000a)")
                 );
-                let officeSize = ns.corporation.getOffice(tbDivName, tbRDCity).size;
-                while (ns.corporation.getOffice(tbDivName, tbRDCity).employees.length < officeSize) {
+                let officeSize = ns.corporation.getOffice(
+                    tbDivName,
+                    tbRDCity
+                ).size;
+                while (
+                    ns.corporation.getOffice(tbDivName, tbRDCity).employees
+                        .length < officeSize
+                ) {
                     ns.corporation.hireEmployee(tbDivName, tbRDCity);
                 }
 
-                await ns.corporation.setAutoJobAssignment(tbDivName, tbRDCity, "Unassigned", officeSize);
+                await ns.corporation.setAutoJobAssignment(
+                    tbDivName,
+                    tbRDCity,
+                    "Unassigned",
+                    officeSize
+                );
 
-                await ns.corporation.setAutoJobAssignment(tbDivName, tbRDCity, "Operations", officeSize / 5);
-                await ns.corporation.setAutoJobAssignment(tbDivName, tbRDCity, "Engineer", officeSize / 5);
-                await ns.corporation.setAutoJobAssignment(tbDivName, tbRDCity, "Business", officeSize / 5);
-                await ns.corporation.setAutoJobAssignment(tbDivName, tbRDCity, "Management", officeSize / 5);
+                await ns.corporation.setAutoJobAssignment(
+                    tbDivName,
+                    tbRDCity,
+                    "Operations",
+                    officeSize / 5
+                );
+                await ns.corporation.setAutoJobAssignment(
+                    tbDivName,
+                    tbRDCity,
+                    "Engineer",
+                    officeSize / 5
+                );
+                await ns.corporation.setAutoJobAssignment(
+                    tbDivName,
+                    tbRDCity,
+                    "Business",
+                    officeSize / 5
+                );
+                await ns.corporation.setAutoJobAssignment(
+                    tbDivName,
+                    tbRDCity,
+                    "Management",
+                    officeSize / 5
+                );
                 await ns.corporation.setAutoJobAssignment(
                     tbDivName,
                     tbRDCity,
@@ -1087,11 +1523,20 @@ export async function main(ns) {
                 // of upgrading is less than 5% of the corporation's funds
                 while (
                     ns.corporation.getOffice(tbDivName, city).size <
-                        ns.corporation.getOffice(tbDivName, tbRDCity).size * 0.2 &&
-                    ns.corporation.getOfficeSizeUpgradeCost(tbDivName, city, 5) <
+                        ns.corporation.getOffice(tbDivName, tbRDCity).size *
+                            0.2 &&
+                    ns.corporation.getOfficeSizeUpgradeCost(
+                        tbDivName,
+                        city,
+                        5
+                    ) <
                         ns.corporation.getCorporation().funds * 0.05
                 ) {
-                    let cost = ns.corporation.getOfficeSizeUpgradeCost(tbDivName, city, 5);
+                    let cost = ns.corporation.getOfficeSizeUpgradeCost(
+                        tbDivName,
+                        city,
+                        5
+                    );
                     ns.corporation.upgradeOfficeSize(tbDivName, city, 5);
 
                     if (!(city in cityIncrease)) {
@@ -1116,17 +1561,50 @@ export async function main(ns) {
                     ns.nFormat(val.cost, "($0.000a)")
                 );
                 let officeSize = ns.corporation.getOffice(tbDivName, city).size;
-                while (ns.corporation.getOffice(tbDivName, city).employees.length < officeSize) {
+                while (
+                    ns.corporation.getOffice(tbDivName, city).employees.length <
+                    officeSize
+                ) {
                     ns.corporation.hireEmployee(tbDivName, city);
                 }
 
-                await ns.corporation.setAutoJobAssignment(tbDivName, city, "Unassigned", officeSize);
+                await ns.corporation.setAutoJobAssignment(
+                    tbDivName,
+                    city,
+                    "Unassigned",
+                    officeSize
+                );
 
-                await ns.corporation.setAutoJobAssignment(tbDivName, city, "Operations", officeSize / 5);
-                await ns.corporation.setAutoJobAssignment(tbDivName, city, "Engineer", officeSize / 5);
-                await ns.corporation.setAutoJobAssignment(tbDivName, city, "Business", officeSize / 5);
-                await ns.corporation.setAutoJobAssignment(tbDivName, city, "Management", officeSize / 5);
-                await ns.corporation.setAutoJobAssignment(tbDivName, city, "Research & Development", officeSize / 5);
+                await ns.corporation.setAutoJobAssignment(
+                    tbDivName,
+                    city,
+                    "Operations",
+                    officeSize / 5
+                );
+                await ns.corporation.setAutoJobAssignment(
+                    tbDivName,
+                    city,
+                    "Engineer",
+                    officeSize / 5
+                );
+                await ns.corporation.setAutoJobAssignment(
+                    tbDivName,
+                    city,
+                    "Business",
+                    officeSize / 5
+                );
+                await ns.corporation.setAutoJobAssignment(
+                    tbDivName,
+                    city,
+                    "Management",
+                    officeSize / 5
+                );
+                await ns.corporation.setAutoJobAssignment(
+                    tbDivName,
+                    city,
+                    "Research & Development",
+                    officeSize / 5
+                );
             }
 
             didUpdate = true;
@@ -1140,24 +1618,37 @@ export async function main(ns) {
 
     for (const div of corp.divisions) {
         doLog(ns, "%s: %s - %s", corp.name, div.name, div.type);
-        const products = div.products.map((prodname) => ns.corporation.getProduct(div.name, prodname));
+        const products = div.products.map((prodname) =>
+            ns.corporation.getProduct(div.name, prodname)
+        );
 
         for (const product of products) {
-            const marketFactor = Math.max(0.1, (product.dmd * (100 - product.cmp)) / 100);
+            const marketFactor = Math.max(
+                0.1,
+                (product.dmd * (100 - product.cmp)) / 100
+            );
             doLog(ns, "  %s:", product.name);
             //doLog(ns, "      Development Progress: %s", product.developmentProgress)
-            doLog(ns, "      Market Price: %s", ns.nFormat(product.pCost, "($0.000a)"));
+            doLog(
+                ns,
+                "      Market Price: %s",
+                ns.nFormat(product.pCost, "($0.000a)")
+            );
             doLog(
                 ns,
                 "      Sell Cost: %s",
-                typeof product.sCost === "string" ? product.sCost : ns.nFormat(product.sCost, "($0.000a)")
+                typeof product.sCost === "string"
+                    ? product.sCost
+                    : ns.nFormat(product.sCost, "($0.000a)")
             );
             doLog(ns, "      Competition: %.2f", product.cmp);
             doLog(ns, "      Demand: %.2f", product.dmd);
             doLog(ns, "      Market Factor: %.2f", marketFactor);
 
             let mult = 32;
-            for (const [key, [qty, prod, sell]] of Object.entries(product.cityData)) {
+            for (const [key, [qty, prod, sell]] of Object.entries(
+                product.cityData
+            )) {
                 const prodDeficit = prod + 0.00000001 - sell;
                 doLog(
                     ns,

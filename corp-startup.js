@@ -1,4 +1,5 @@
 // Requires WarehouseAPI and OfficeAPI
+// TODO: buy advert in Tobacco
 import { getJobs } from "/corporation/utils.js";
 import { getCities } from "/utils/utils.js";
 
@@ -34,6 +35,11 @@ export async function main(ns) {
 }
 
 export async function part1(ns, cities, jobs, division) {
+    try {
+        ns.corporation.getCorporation();
+    } catch (e) {
+        ns.corporation.createCorporation("Corporation", true);
+    }
     const corp = ns.corporation;
     try {
         // Expand to division and get smart supply
@@ -107,7 +113,7 @@ export async function part2(ns, cities, jobs, division) {
             await ns.sleep(1000);
         }
     }
-    cookTheBook(ns);
+    await cookTheBook(ns);
     ns.print("Wait for investment offer of $210b");
     // Wait for investment offer of $210b
     while (corp.getInvestmentOffer().funds < 210e9) {
@@ -119,6 +125,10 @@ export async function part2(ns, cities, jobs, division) {
     // Upgrade office size to nine
     for (let city of cities) {
         corp.upgradeOfficeSize(division, city, 6);
+        // Hire 6 employees
+        for (let i = 0; i < 6; i++) {
+            corp.hireEmployee(division, city);
+        }
         await corp.setAutoJobAssignment(division, city, "Operations", 2);
         await corp.setAutoJobAssignment(division, city, "Engineer", 2);
         await corp.setAutoJobAssignment(division, city, "Business", 1);
@@ -171,7 +181,7 @@ export async function part2(ns, cities, jobs, division) {
             await ns.sleep(1000);
         }
     }
-    cookTheBook(ns);
+    await cookTheBook(ns);
     // Wait for investment offer of $5t
     while (corp.getInvestmentOffer().funds < 5e12) {
         await ns.sleep(1000);
@@ -269,9 +279,9 @@ export async function part3(ns, cities, jobs, division) {
     }
     //Start making Tobacco v1
     try {
-        corp.getProduct(division, "Tobacco v1");
+        corp.getProduct(division, "1");
     } catch (err) {
-        corp.makeProduct(division, "Aevum", "Tobacco v1", 1e9, 1e9);
+        corp.makeProduct(division, "Aevum", "1", 1e9, 1e9);
     }
     // Get upgrades
     while (true) {
@@ -297,37 +307,31 @@ export async function part3(ns, cities, jobs, division) {
 
         await ns.sleep(1000);
     }
+    while (corp.funds > corp.getHireAdVertCost(division)) {
+        corp.hireAdvert(division);
+    }
     // Wait for Tobacco v1 to finish
-    while (corp.getProduct(division, "Tobacco v1").developmentProgress < 100) {
+    while (corp.getProduct(division, "1").developmentProgress < 100) {
         await ns.sleep(1000);
     }
     // Start selling Tobacco v1 in all cities
-    corp.sellProduct(division, "Aevum", "Tobacco v1", "MAX", "MP*2", true);
+    corp.sellProduct(division, "Aevum", "1", "MAX", "MP*2", true);
     // Start making Tobacco v2
     try {
-        corp.getProduct(division, "Tobacco v2");
+        corp.getProduct(division, "2");
     } catch (err) {
-        corp.makeProduct(division, "Aevum", "Tobacco v2", 1e9, 1e9);
+        corp.makeProduct(division, "Aevum", "2", 1e9, 1e9);
     }
     // Upgrade Aevum office size
     while (corp.getOffice(division, "Aevum").size < 60) {
         corp.upgradeOfficeSize(division, "Aevum", 30);
         // Start selling Tobacco v2 and start making Tobacco v3 if it finishes
-        if (
-            corp.getProduct(division, "Tobacco v2").developmentProgress === 100
-        ) {
-            corp.sellProduct(
-                division,
-                "Aevum",
-                "Tobacco v2",
-                "MAX",
-                "MP*4",
-                true
-            );
+        if (corp.getProduct(division, "2").developmentProgress === 100) {
+            corp.sellProduct(division, "Aevum", "2", "MAX", "MP*4", true);
             try {
-                corp.getProduct(division, "Tobacco v3");
+                corp.getProduct(division, "3");
             } catch (err) {
-                corp.makeProduct(division, "Aevum", "Tobacco v3", 1e9, 1e9);
+                corp.makeProduct(division, "Aevum", "3", 1e9, 1e9);
             }
         }
         await ns.sleep(1000);
@@ -346,14 +350,14 @@ export async function part3(ns, cities, jobs, division) {
         12
     );
     // Wait for Tobacco v2 to finish
-    while (corp.getProduct(division, "Tobacco v2").developmentProgress < 100) {
+    while (corp.getProduct(division, "2").developmentProgress < 100) {
         await ns.sleep(1000);
     }
-    corp.sellProduct(division, "Aevum", "Tobacco v2", "MAX", "MP*4", true);
+    corp.sellProduct(division, "Aevum", "2", "MAX", "MP*4", true);
     try {
-        corp.getProduct(division, "Tobacco v3");
+        corp.getProduct(division, "3");
     } catch (err) {
-        corp.makeProduct(division, "Aevum", "Tobacco v3", 1e9, 1e9);
+        corp.makeProduct(division, "Aevum", "3", 1e9, 1e9);
     }
 }
 
@@ -504,6 +508,6 @@ async function cookTheBook(ns) {
     }
     for (let city of cities) {
         ns.corporation.sellMaterial(division, city, "Plants", "MAX", "MP");
-        ns.corporation.sellMaterial(division, city, "Food", "MAX", "MP");
+        ns.corporation.sellMaterial(division, city, "Food", "MAX", "MP"); 
     }
 }
