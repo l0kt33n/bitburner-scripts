@@ -1,5 +1,6 @@
 // Requires WarehouseAPI and OfficeAPI
 // TODO: buy advert in Tobacco
+import { log, getFilePath } from "./helpers.js";
 import { getJobs } from "/corporation/utils.js";
 import { getCities } from "/utils/utils.js";
 
@@ -14,10 +15,7 @@ export async function main(ns) {
         !ns.corporation.hasUnlockUpgrade("Office API")
     )
         throw new Error(`This script requires the Office API`);
-    // if (ns.getBitNodeMultipliers().CorporationValuation !== 1)
-    //     throw new Error(
-    //         `This script does not know how to deal with BitNodes that have a valuation modifier`
-    //     );
+
     // Set up
     const cities = getCities();
     const jobs = getJobs();
@@ -31,7 +29,7 @@ export async function main(ns) {
     // Part 3
     await part3(ns, cities, jobs, division2);
     // Autopilot
-    //await autopilot(ns, cities, jobs, division2);
+    await launchManagers(ns);
 }
 
 export async function part1(ns, cities, jobs, division) {
@@ -310,182 +308,106 @@ export async function part3(ns, cities, jobs, division) {
     while (corp.funds > corp.getHireAdVertCost(division)) {
         corp.hireAdvert(division);
     }
-    // Wait for Tobacco v1 to finish
-    while (corp.getProduct(division, "1").developmentProgress < 100) {
-        await ns.sleep(1000);
-    }
-    // Start selling Tobacco v1 in all cities
-    corp.sellProduct(division, "Aevum", "1", "MAX", "MP*2", true);
-    // Start making Tobacco v2
-    try {
-        corp.getProduct(division, "2");
-    } catch (err) {
-        corp.makeProduct(division, "Aevum", "2", 1e9, 1e9);
-    }
-    // Upgrade Aevum office size
-    while (corp.getOffice(division, "Aevum").size < 60) {
-        corp.upgradeOfficeSize(division, "Aevum", 30);
-        // Start selling Tobacco v2 and start making Tobacco v3 if it finishes
-        if (corp.getProduct(division, "2").developmentProgress === 100) {
-            corp.sellProduct(division, "Aevum", "2", "MAX", "MP*4", true);
-            try {
-                corp.getProduct(division, "3");
-            } catch (err) {
-                corp.makeProduct(division, "Aevum", "3", 1e9, 1e9);
-            }
-        }
-        await ns.sleep(1000);
-    }
-    for (let i = 0; i < 30; i++) {
-        corp.hireEmployee(division, city);
-    }
-    await corp.setAutoJobAssignment(division, "Aevum", "Operations", 12);
-    await corp.setAutoJobAssignment(division, "Aevum", "Engineer", 12);
-    await corp.setAutoJobAssignment(division, "Aevum", "Business", 12);
-    await corp.setAutoJobAssignment(division, "Aevum", "Management", 12);
-    await corp.setAutoJobAssignment(
-        division,
-        "Aevum",
-        "Research & Development",
-        12
+}
+
+async function launchManagers(ns) {
+    let asynchronousHelpers = [
+        {
+            name: "corp-manager.js",
+            shouldRun: () => playerStats.hasCorporation,
+        }, // Script to create manage our corp for us
+        {
+            name: "corp-priceTuner.js",
+            shouldRun: () => playerStats.hasCorporation,
+        }, // Script to create manage our corp for us
+        {
+            name: "spend-hacknet-hashes.js",
+            args: [
+                "--spend-on",
+                "Exchange_for_Corporation_Research",
+                "-l",
+                "-v",
+            ],
+            shouldRun: () => playerStats.hasCorporation,
+        },
+    ];
+    asynchronousHelpers.forEach(
+        (helper) => (helper.name = getFilePath(helper.name))
     );
-    // Wait for Tobacco v2 to finish
-    while (corp.getProduct(division, "2").developmentProgress < 100) {
-        await ns.sleep(1000);
-    }
-    corp.sellProduct(division, "Aevum", "2", "MAX", "MP*4", true);
-    try {
-        corp.getProduct(division, "3");
-    } catch (err) {
-        corp.makeProduct(division, "Aevum", "3", 1e9, 1e9);
+    asynchronousHelpers.forEach((helper) => (helper.isLaunched = false));
+    asynchronousHelpers.forEach((helper) => (helper.requiredServer = "home")); // All helpers should be launched at home since they use tempory scripts, and we only reserve ram on home
+
+    await buildToolkit(ns); // build toolkit
+    await runStartupScripts(ns); // Start helper scripts
+}
+
+/** @param {NS} ns **/
+async function buildToolkit(ns) {
+    log("buildToolkit");
+    let allTools = hackTools
+        .concat(asynchronousHelpers)
+        .concat(periodicScripts);
+    let toolCosts = await getNsDataThroughFile(
+        ns,
+        `Object.fromEntries(${JSON.stringify(allTools.map((t) => t.name))}` +
+            `.map(s => [s, ns.getScriptRam(s, '${daemonHost}')]))`,
+        "/Temp/script-costs.txt"
+    );
+    for (const toolConfig of allTools) {
+        let tool = {
+            instance: ns,
+            name: toolConfig.name,
+            shortName: toolConfig.shortName,
+            tail: toolConfig.tail || false,
+            args: toolConfig.args || [],
+            shouldRun: toolConfig.shouldRun,
+            requiredServer: toolConfig.requiredServer,
+            isThreadSpreadingAllowed:
+                toolConfig.threadSpreadingAllowed === true,
+            cost: toolCosts[toolConfig.name],
+            canRun: function (server) {
+                return (
+                    doesFileExist(this.name, server.name) &&
+                    server.ramAvailable() >= this.cost
+                );
+            },
+            getMaxThreads: function () {
+                // analyzes the servers array and figures about how many threads can be spooled up across all of them.
+                let maxThreads = 0;
+                sortServerList("ram");
+                for (const server of serverListByFreeRam.filter((s) =>
+                    s.hasRoot()
+                )) {
+                    // Note: To be conservative, we allow double imprecision to cause this floor() to return one less than should be possible,
+                    //       because the game likely doesn't account for this imprecision (e.g. let 1.9999999999999998 return 1 rather than 2)
+                    var threadsHere = Math.floor(
+                        server.ramAvailable() / this.cost /*.toPrecision(14)*/
+                    );
+                    if (!this.isThreadSpreadingAllowed) return threadsHere;
+                    maxThreads += threadsHere;
+                }
+                return maxThreads;
+            },
+        };
+        tools.push(tool);
+        toolsByShortName[tool.shortName || hashToolDefinition(tool)] = tool;
     }
 }
 
-export async function autopilot(ns, cities, jobs, division) {
-    const corp = ns.corporation;
-    // Assuming Tobacco v3 has already started
-    let version = 3;
-    while (!corp.getProduct(division, "Tobacco v" + version)) {
-        await ns.sleep(1000);
-    }
-    while (true) {
-        // Check tobacco progress
+// Helper to kick off helper scripts
+/** @param {NS} ns **/
+async function runStartupScripts(ns) {
+    for (const helper of asynchronousHelpers)
         if (
-            corp.getProduct(division, "Tobacco v" + version)
-                .developmentProgress === 100
-        ) {
-            // Start selling the developed version
-            corp.sellProduct(
-                division,
-                "Aevum",
-                "Tobacco v" + version,
-                "MAX",
-                "MP*" + 2 ** version,
-                true
-            );
-            if (corp.hasResearched(division, "Market-TA.II"))
-                corp.setProductMarketTA2(division, "Tobacco v" + version, true);
-            // Discontinue previous version
-            corp.discontinueProduct(division, "Tobacco v" + (version - 1));
-            // Start making new version
-            version++;
-            if (!corp.getProduct(division, "Tobacco v" + version))
-                corp.makeProduct(
-                    division,
-                    "Aevum",
-                    "Tobacco v" + version,
-                    1e9,
-                    1e9
-                );
-        }
-        // Check research progress for Market TA
-        let researchCost = 0;
-        if (!corp.hasResearched(division, "Market-TA.I"))
-            researchCost += corp.getResearchCost(division, "Market-TA.I");
-        if (!corp.hasResearched(division, "Market-TA.II"))
-            researchCost += corp.getResearchCost(division, "Market-TA.II");
-        if (
-            researchCost > 0 &&
-            corp.getDivision(division).research >= 1.5 * researchCost
-        ) {
-            if (!corp.hasResearched(division, "Market-TA.I"))
-                corp.research(division, "Market-TA.I");
-            if (!corp.hasResearched(division, "Market-TA.II")) {
-                corp.research(division, "Market-TA.II");
-                // Set Market TA.II on for the current selling versions
-                corp.setProductMarketTA2(
-                    division,
-                    "Tobacco v" + (version - 2),
-                    true
-                );
-                corp.setProductMarketTA2(
-                    division,
-                    "Tobacco v" + (version - 1),
-                    true
-                );
-            }
-        }
-        // Upgrade Wilson analytics if we can
-        try {
-            corp.levelUpgrade("Wilson Analytics");
-        } catch {}
-
-        // Check what is cheaper
-        if (
-            corp.getOfficeSizeUpgradeCost(division, "Aevum", 15) <
-            corp.getHireAdVertCost(division)
-        ) {
-            // Upgrade office size in Aevum
-            if (
-                corp.getOfficeSizeUpgradeCost(division, "Aevum", 15) <=
-                corp.getCorporation().funds
-            ) {
-                corp.upgradeOfficeSize(division, "Aevum", 15);
-                for (let i = 0; i < 15; i++) {
-                    corp.hireEmployee(division, "Aevum");
-                }
-                let dist = Math.floor(
-                    corp.getOffice(division, "Aevum").size / 5
-                );
-                await corp.setAutoJobAssignment(
-                    division,
-                    "Aevum",
-                    "Operations",
-                    dist
-                );
-                await corp.setAutoJobAssignment(
-                    division,
-                    "Aevum",
-                    "Engineer",
-                    dist
-                );
-                await corp.setAutoJobAssignment(
-                    division,
-                    "Aevum",
-                    "Business",
-                    dist
-                );
-                await corp.setAutoJobAssignment(
-                    division,
-                    "Aevum",
-                    "Management",
-                    dist
-                );
-                await corp.setAutoJobAssignment(
-                    division,
-                    "Aevum",
-                    "Research & Development",
-                    dist
-                );
-            }
-        }
-        // Hire advert
-        else if (
-            corp.getHireAdVertCost(division) <= corp.getCorporation().funds
+            !helper.isLaunched &&
+            (helper.shouldRun === undefined || helper.shouldRun())
         )
-            corp.hireAdVert(division);
-        await ns.sleep(1000);
-    }
+            helper.isLaunched = await tryRunTool(ns, getTool(helper));
+    // if every helper is launched already return "true" so we can skip doing this each cycle going forward.
+    return asynchronousHelpers.reduce(
+        (allLaunched, tool) => allLaunched && tool.isLaunched,
+        true
+    );
 }
 
 async function cookTheBook(ns) {
@@ -508,6 +430,6 @@ async function cookTheBook(ns) {
     }
     for (let city of cities) {
         ns.corporation.sellMaterial(division, city, "Plants", "MAX", "MP");
-        ns.corporation.sellMaterial(division, city, "Food", "MAX", "MP"); 
+        ns.corporation.sellMaterial(division, city, "Food", "MAX", "MP");
     }
 }

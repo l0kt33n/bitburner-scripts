@@ -24,7 +24,7 @@ function checkForTAII(ns){
     let allHasTAII = true;
     const divisions = ns.corporation.getCorporation().divisions;
     for (const div of divisions) {
-        ns.tprint(div.name + ns.corporation.hasResearched(div.name, "Market-TA.II"))
+        //ns.tprint(div.name + ns.corporation.hasResearched(div.name, "Market-TA.II"))
         if (!ns.corporation.hasResearched(div.name, "Market-TA.II")) {
             allHasTAII = false;
             break;
@@ -41,7 +41,7 @@ export async function main(ns) {
 
     // Get some info about the corporation.
 
-    ns.tail();
+    //ns.tail();
     let whdata = new Map();
     let lastState = "";
     let corp = ns.corporation.getCorporation();
@@ -49,10 +49,10 @@ export async function main(ns) {
     while (!checkForTAII(ns)) {
         //ns.clearLog();
 
-        if (corp.state === "START" && corp.state !== lastState) {
+        //if (corp.state === "START" && corp.state !== lastState) {
             whdata = tuneMaterialSales(ns, whdata);
             whdata = tuneProductSales(ns, whdata);
-        }
+        //}
 
         let report = getDivisionReport(ns);
         for (const line of report) {
@@ -211,7 +211,7 @@ function tuneProductSales(ns, data) {
                         .get(cities[0])
                         .get(material.name);
                     // This is something we're producing.
-                    let delta = material.prod - material.prod;
+                    let delta = material.prod - material.sell;
                     //ns.tprint(`${div.name}, ${city}, ${material.name}, Qty: ${nf(material.qty)} (${npsf(delta)}) Last price: ${last.toFixed(3)}`);
                     if (material.qty === 0) {
                         // We're selling everything down to 0. Give the price a boost.

@@ -3,7 +3,7 @@ import { log, calc_material, IndustrialFactors } from "util/helpers.js";
 const LOG_FILE = "corporation-log.txt";
 
 const UPGRADE_THRESHOLD = 5 / 100;
-const WAREHOUSE_UPGRADE_THRESHOLD = 1 / 100;
+const WAREHOUSE_UPGRADE_THRESHOLD = 5 / 100;
 const ADVERT_UPGRADE_THRESHOLD = 50 / 100;
 const PRODUCT_THRESHOLD = 10 / 100;
 const STOCK_THRESHOLD = 1 / 100;
@@ -59,10 +59,10 @@ async function manager(ns, i) {
             await purchaseWarehouses(ns, division.name, city);
             await log(ns, LOG_FILE, "setting prices");
             await setSellPrices(ns, division.name, city);
-            if (i != 0 && i % 30 == 0) {
-                await log(ns, LOG_FILE, "buying boost materials");
-                await buyBoostMaterials(ns, division.name, city);
-            }
+            // if (i != 0 && i % 30 == 0) {
+            //     await log(ns, LOG_FILE, "buying boost materials");
+            //     await buyBoostMaterials(ns, division.name, city);
+            // }
         }
     }
     await handleStocks(ns);
