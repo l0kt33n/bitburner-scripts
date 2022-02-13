@@ -1,5 +1,5 @@
-import constants from "util/constants.js";
-import { log, calc_material, IndustrialFactors } from "util/helpers.js";
+import constants from "utils/constants.js";
+import { log, calc_material, IndustrialFactors } from "utils/helpers.js";
 const LOG_FILE = "corporation-log.txt";
 
 const UPGRADE_THRESHOLD = 5 / 100;
