@@ -1,6 +1,6 @@
 import { getNsDataThroughFile, disableLogs, formatNumberShort, getFilePath, waitForProcessToComplete } from './helpers.js'
 
-const maxCharges = 10000; // Don't bother adding charges beyond this amount (diminishing returns - num charges is ^0.07 )
+const maxCharges = 100; // Don't bother adding charges beyond this amount (diminishing returns - num charges is ^0.07 )
 
 /** @param {NS} ns 
  * Maximizes charge on staney fragments based on current home RAM.
